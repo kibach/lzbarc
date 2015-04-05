@@ -1,3 +1,6 @@
+# Code::Blocks
+*.cbp
+
 # Object files
 *.o
 *.ko
