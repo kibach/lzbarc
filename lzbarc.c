@@ -3,7 +3,7 @@
 #include <getopt.h>
 #include <ctype.h>
 #include <stdint.h>
-#include "bitvector.h"
+#include "lz77.h"
 
 enum {
     LZB_OPT_COMPRESS = 1,
@@ -45,26 +45,23 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    bitvector testbv;
-
     switch (opindex) {
         case LZB_OPT_COMPRESS:
-            //lzjb_compress();
-            printf("ptr is %p\n", testbv);
-            BV_init(&testbv);
-            printf("ptr is %p now, bits at %p\n", testbv, testbv->bits);
-            int bt = 1 << 5;
-            printf("ret code is %d\n", BV_push_bytes(testbv, (uint8_t *) &bt, 4, 8));
-            for (int i = 1; i <= 8; ++i) {
-                printf("%dth bit is %d\n", i, BV_get_by_index(testbv, i));
+            printf("lz77 compress from=%s to=%s\n", infile, outfile);
+            FILE * inp_f = fopen(infile, "r");
+            FILE * out_f = fopen(outfile, "w");
+            fseek(inp_f, 0L, SEEK_END);
+            uint32_t inp_sz = ftell(inp_f);
+            fseek(inp_f, 0L, SEEK_SET);
+            uint8_t lz_res = lz77_compress(inp_f, out_f, inp_sz);
+            if (lz_res == LZ77_SUCCESS) {
+                printf("lz77 compressed!\n");
             }
-            BV_close(&testbv);
-            printf("ptr is %p and freed\n", testbv);
-            printf("lzjb compress from=%s to=%s\n", infile, outfile);
+            fclose(inp_f);
+            fclose(out_f);
             break;
         case LZB_OPT_DECOMPRESS:
-            //lzjb_decompress();
-            printf("lzjb decompress from=%s to=%s\n", infile, outfile);
+            printf("lz77 decompress from=%s to=%s\n", infile, outfile);
             break;
         default:
             printf("Unrecognized option\n");
