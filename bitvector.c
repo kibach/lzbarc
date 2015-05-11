@@ -9,7 +9,7 @@
 /*
  * Initializes bitvector.
  */
-uint8_t BV_init(bitvector *op, FILE * flush) {
+uint8_t BV_init(bitvector *op, FILE * flush, FILE * fswap, uint32_t lsize) {
     (*op) = malloc(sizeof(struct bitarray));
     if (unlikely(((*op)->bits = malloc(sizeof(uint8_t))) == NULL)) {
         return BV_MEMORY_ERROR;
@@ -19,6 +19,8 @@ uint8_t BV_init(bitvector *op, FILE * flush) {
     (*op)->allocated_bytes = 0;
     (*op)->fifo_start = 0;
     (*op)->flush_to = flush;
+    (*op)->load_from = fswap;
+    (*op)->load_size = lsize;
     return BV_SUCCESS;
 }
 
@@ -30,7 +32,7 @@ uint8_t BV_get_by_index(bitvector op, uint32_t index) {
     if (unlikely(index > op->bitsize)) {
         return BV_RANGE_ERROR;
     }
-    return (op->bits[index / BITS_PER_BYTE] >> ((index % BITS_PER_BYTE) - 1)) & 1;
+    return (op->bits[index / BITS_PER_BYTE] >> ((index % BITS_PER_BYTE))) & 1;
 }
 
 /*
@@ -53,7 +55,7 @@ uint8_t BV_set_by_index(bitvector op, uint32_t index, uint8_t bit_value) {
  * Uses BV_set_by_index function.
  */
 uint8_t BV_push_bit(bitvector op, uint8_t bit_value) {
-    if (/*(op->bitsize > 0) && */(op->bitsize % BITS_PER_BYTE == 0)) {
+    if (op->bitsize % BITS_PER_BYTE == 0) {
         uint8_t * new_bits;
         if ((new_bits = realloc(op->bits, ((op->allocated_bytes++) + 1) * sizeof(uint8_t))) == NULL) {
             fprintf(stderr, "ERROR: realloc failed\n");
@@ -91,8 +93,8 @@ uint8_t BV_push_bytes(bitvector op, uint8_t * bytes, uint32_t bytes_size, uint32
         if (unlikely(ret != BV_SUCCESS)) {
             return ret;
         }
-        bits_from_current_byte++;
-        changed_bits_count++;
+        ++bits_from_current_byte;
+        ++changed_bits_count;
         if (unlikely(bits_from_current_byte == BITS_PER_BYTE)) {
             bytes++;
             bits_from_current_byte = 0;
@@ -123,9 +125,63 @@ void BV_close(bitvector *op) {
  * Force flush bitvector to file.
  */
 uint8_t BV_flush(bitvector op) {
-    if (op->flush_to == 0) {
+    if (unlikely(op->flush_to == 0)) {
         return BV_FLUSH_ERROR;
     }
     fwrite(op->bits, sizeof(uint8_t), op->allocated_bytes, op->flush_to);
     return BV_SUCCESS;
+}
+
+/*
+ * Pops a bit as from FIFO queue
+ */
+uint8_t BV_pop_bit(bitvector op) {
+    uint8_t bpop_res = BV_get_by_index(op, op->fifo_start++);
+    return bpop_res;
+}
+
+/*
+ * Pops a specified amount of bits as from FIFO queue
+ */
+uint8_t BV_pop_bytes(bitvector op, uint8_t * dest, uint32_t bitcount) {
+    if (unlikely(bitcount > (op->bitsize - op->fifo_start))) {
+        return BV_RANGE_ERROR;
+    }
+    uint32_t donebits = 0;
+    while (donebits < bitcount) {
+        uint8_t bpop_res = BV_pop_bit(op);
+        if (bpop_res == BV_RANGE_ERROR) {
+            return BV_RANGE_ERROR;
+        }
+        dest[donebits / BITS_PER_BYTE] ^= (-bpop_res ^ dest[donebits / BITS_PER_BYTE]) & (1 << (donebits % BITS_PER_BYTE));
+        ++donebits;
+    }
+    return BV_SUCCESS;
+}
+
+/*
+ * Clears bitvector
+ */
+uint8_t BV_clear(bitvector op) {
+    free(op->bits);
+    if (unlikely((op->bits = malloc(sizeof(uint8_t))) == NULL)) {
+        return BV_MEMORY_ERROR;
+    }
+    op->bits[0] = 0;
+    op->bitsize = 0;
+    op->allocated_bytes = 0;
+    op->fifo_start = 0;
+    return BV_SUCCESS;
+}
+
+uint8_t BV_empty(bitvector op) {
+    return (op->bitsize - 8) <= op->fifo_start;
+}
+
+uint8_t BV_load(bitvector op) {
+    uint8_t * fbuf = malloc(sizeof(uint8_t) * op->load_size);
+    fread(fbuf, sizeof(uint8_t), op->load_size, op->load_from);
+    uint8_t res = BV_push_bytes(op, fbuf, op->load_size, op->load_size * BITS_PER_BYTE);
+    free(fbuf);
+    return res;
 }

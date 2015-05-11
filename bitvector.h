@@ -13,6 +13,8 @@ struct bitarray {
     uint32_t fifo_start;
     uint32_t allocated_bytes;
     FILE * flush_to;
+    FILE * load_from;
+    uint32_t load_size;
 };
 
 typedef struct bitarray * bitvector;
@@ -31,13 +33,18 @@ enum {
     BYTES_PER_FLUSHBLOCK = 1024
 };
 
-extern uint8_t BV_init(bitvector *op, FILE * flush);
+extern uint8_t BV_init(bitvector *op, FILE * flush, FILE * fswap, uint32_t lsize);
 extern uint8_t BV_get_by_index(bitvector op, uint32_t index);
 extern uint8_t BV_set_by_index(bitvector op, uint32_t index, uint8_t bit_value);
 extern uint8_t BV_push_bit(bitvector op, uint8_t bit_value);
 extern uint8_t BV_push_bytes(bitvector op, uint8_t * bytes, uint32_t bytes_size, uint32_t significant_bits_count);
 extern uint8_t BV_fill(bitvector op);
-extern void BV_close(bitvector *op);
 extern uint8_t BV_flush(bitvector op);
+extern uint8_t BV_clear(bitvector op);
+extern uint8_t BV_pop_bit(bitvector op);
+extern uint8_t BV_empty(bitvector op);
+extern uint8_t BV_load(bitvector op);
+extern uint8_t BV_pop_bytes(bitvector op, uint8_t * dest, uint32_t bitcount);
+extern void BV_close(bitvector *op);
 
 #endif // BITVECTOR_H_INCLUDED
