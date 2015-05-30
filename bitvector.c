@@ -1,7 +1,3 @@
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
 #include "bitvector.h"
 #define likely(x)	__builtin_expect(!!(x), 1)
 #define unlikely(x)	__builtin_expect(!!(x), 0)
@@ -128,7 +124,12 @@ uint8_t BV_flush(bitvector op) {
     if (unlikely(op->flush_to == 0)) {
         return BV_FLUSH_ERROR;
     }
+    FILE * tmp = fopen("tmp.tmp", "w");
+    char * ns = "";
+    fwrite(ns, sizeof(uint8_t), 1, op->flush_to);
     fwrite(op->bits, sizeof(uint8_t), op->allocated_bytes, op->flush_to);
+    fwrite(op->bits, sizeof(uint8_t), op->allocated_bytes, tmp);
+    fclose(tmp);
     return BV_SUCCESS;
 }
 

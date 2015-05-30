@@ -50,7 +50,7 @@ uint8_t lz77_helper_shift_array(uint8_t * arr, uint8_t * suffix, uint8_t arr_siz
     return LZ77_SUCCESS;
 }
 
-uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize) {
+uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize, char * fname, uint8_t (* header_func) (FILE *, char *, uint32_t, uint32_t)) {
     uint8_t lookahead[LEMPEL_WINDOW_SIZE + LOOKAHEAD_BUFFER_SIZE + 1];
     uint8_t fbuf[LOOKAHEAD_BUFFER_SIZE + 1];
     uint32_t i = 0;
@@ -84,7 +84,7 @@ uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize) {
             if (BV_push_bytes(bits, (uint8_t *) &best_match_length, sizeof(uint8_t), 4) != BV_SUCCESS) {
                 return LZ77_FAILED;
             }
-            printf("<1, %d, %d>\n", best_match_distance, best_match_length);
+            //printf("<1, %d, %d>\n", best_match_distance, best_match_length);
             if (!feof(infile)) {
                 uint16_t read;
                 memset(fbuf, 0, sizeof(uint8_t) * best_match_length);
@@ -111,7 +111,7 @@ uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize) {
             if (BV_push_bytes(bits, (uint8_t *)lookahead + LEMPEL_WINDOW_SIZE, sizeof(uint8_t), BITS_PER_BYTE) != BV_SUCCESS) {
                 return LZ77_FAILED;
             }
-            printf("<0, 0x%02x>\n", lookahead[LEMPEL_WINDOW_SIZE]);
+            //printf("<0, 0x%02x>\n", lookahead[LEMPEL_WINDOW_SIZE]);
             if (!feof(infile)) {
                 if (fread(fbuf, sizeof(uint8_t), 1, infile) == 0) {
                     return LZ77_FAILED;
@@ -128,6 +128,9 @@ uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize) {
     }
     if (BV_fill(bits) != BV_SUCCESS) {
         return LZ77_FAILED;
+    }
+    if (header_func != NULL) {
+        (*header_func)(outfile, fname, insize, bits->allocated_bytes);
     }
     if (BV_flush(bits) != BV_SUCCESS) {
         return LZ77_FAILED;
@@ -159,7 +162,7 @@ uint8_t lz77_decompress(FILE * infile, FILE * outfile, uint32_t insize) {
             }
             fwrite(&byte, sizeof(uint8_t), 1, outfile);
             lz77_helper_shift_array(lookahead, &byte, LEMPEL_WINDOW_SIZE + LOOKAHEAD_BUFFER_SIZE + 1, 1);
-            printf("<0, 0x%02x>\n", byte);
+            //printf("<0, 0x%02x>\n", byte);
             ++decsize;
         } else {
             uint8_t match_length = 0;
@@ -176,7 +179,7 @@ uint8_t lz77_decompress(FILE * infile, FILE * outfile, uint32_t insize) {
             }
             lz77_helper_shift_array(lookahead, uncompr, LEMPEL_WINDOW_SIZE + LOOKAHEAD_BUFFER_SIZE + 1, match_length);
             fwrite(uncompr, sizeof(uint8_t), match_length, outfile);
-            printf("<1, %d, %d>\n", match_distance, match_length);
+            //printf("<1, %d, %d>\n", match_distance, match_length);
             free(uncompr);
             decsize += match_length;
         }

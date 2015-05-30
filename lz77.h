@@ -14,7 +14,7 @@ enum {
 
 uint8_t lz77_find_longest_match(uint8_t * la_buf, uint16_t * best_match_distance, uint8_t * best_match_length, uint16_t l, uint16_t r, uint16_t cur);
 uint8_t lz77_helper_shift_array(uint8_t * arr, uint8_t * suffix, uint8_t arr_size, uint8_t suffix_len);
-extern uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize);
+extern uint8_t lz77_compress(FILE * infile, FILE * outfile, uint32_t insize, char * fname, uint8_t (*header_func) (FILE *, char *, uint32_t, uint32_t));
 extern uint8_t lz77_decompress(FILE * infile, FILE * outfile, uint32_t insize);
 
 #endif // LZ77_H_INCLUDED
