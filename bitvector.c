@@ -6,7 +6,7 @@
  * Initializes bitvector.
  */
 uint8_t BV_init(bitvector *op, FILE * flush, FILE * fswap, uint32_t lsize) {
-    (*op) = malloc(sizeof(struct bitarray));
+    (*op) = calloc(1, sizeof(struct bitarray));
     if (unlikely(((*op)->bits = malloc(sizeof(uint8_t))) == NULL)) {
         return BV_MEMORY_ERROR;
     }
@@ -124,12 +124,9 @@ uint8_t BV_flush(bitvector op) {
     if (unlikely(op->flush_to == 0)) {
         return BV_FLUSH_ERROR;
     }
-    FILE * tmp = fopen("tmp.tmp", "w");
     char * ns = "";
     fwrite(ns, sizeof(uint8_t), 1, op->flush_to);
     fwrite(op->bits, sizeof(uint8_t), op->allocated_bytes, op->flush_to);
-    fwrite(op->bits, sizeof(uint8_t), op->allocated_bytes, tmp);
-    fclose(tmp);
     return BV_SUCCESS;
 }
 

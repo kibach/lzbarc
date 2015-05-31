@@ -59,40 +59,29 @@ int main(int argc, char *argv[]) {
     switch (opindex) {
         case LZB_OPT_COMPRESS:
             printf("lz77 compress from=%s to=%s\n", infile, outfile);
-            /*inp_f = fopen(infile, "r");
-            out_f = fopen(outfile, "w");
-            fseek(inp_f, 0L, SEEK_END);
-            inp_sz = ftell(inp_f);
-            fseek(inp_f, 0L, SEEK_SET);
-            lz_res = lz77_compress(inp_f, out_f, inp_sz, "", NULL);
-            if (lz_res == LZ77_SUCCESS) {
-                printf("lz77 compressed!\n");
+            if (DOTLZB_create_file(&out_f, outfile) == DOTLZB_SUCCESS) {
+                DOTLZB_compress_files(out_f, "./", &infile, 1);
+                fclose(out_f);
             }
-            fclose(inp_f);
-            fclose(out_f);*/
-            DOTLZB_create_file(&out_f, outfile);
-            DOTLZB_compress_files(out_f, "./", &infile, 1);
-            fclose(out_f);
             break;
         case LZB_OPT_DECOMPRESS:
             printf("lz77 decompress from=%s to=%s\n", infile, outfile);
-            /*inp_f = fopen(infile, "r");
-            out_f = fopen(outfile, "w");
-            fseek(inp_f, 0L, SEEK_END);
-            inp_sz = ftell(inp_f);
-            fseek(inp_f, 0L, SEEK_SET);
-            lz_res = lz77_decompress(inp_f, out_f, inp_sz);
-            if (lz_res == LZ77_SUCCESS) {
-                printf("lz77 decompressed!\n");
+            if (DOTLZB_open_file(&inp_f, infile) == DOTLZB_SUCCESS) {
+                DOTLZB_decompress_file(inp_f, "./", 0);
+                fclose(inp_f);
             }
-            fclose(inp_f);
-            fclose(out_f);*/
-            DOTLZB_open_file(&inp_f, infile);
-            DOTLZB_decompress_file(inp_f, "./", 0);
-            fclose(inp_f);
             break;
         case LZB_OPT_HELP:
-            printf("Help me!!!11\n");
+            printf("lzbarc 0.1\n");
+            printf("Options:\n");
+            printf("  -c    Compress files\n");
+            printf("        Arguments:\n");
+            printf("        -i <input files>  Input files or file mask\n");
+            printf("        -o <filename>     Output archive name\n");
+            printf("  -d    Decompress archive\n");
+            printf("        Arguments:\n");
+            printf("        -i <filename>     Input archive name\n");
+            printf("  -h    Show this help\n");
             break;
         default:
             printf("Unrecognized option\n");

@@ -5,7 +5,7 @@ const char * DOTLZB_SIGN = "LZB~";
 uint8_t DOTLZB_create_file(FILE ** file, char * filename) {
     *file = fopen(filename, "w");
     if (*file == NULL) {
-        perror("Error");
+        perror("Archive creation error");
         return DOTLZB_FILE_ERROR;
     }
     fwrite(DOTLZB_SIGN, sizeof(char), strlen(DOTLZB_SIGN), *file);
@@ -15,7 +15,7 @@ uint8_t DOTLZB_create_file(FILE ** file, char * filename) {
 uint8_t DOTLZB_open_file(FILE ** file, char * filename) {
     *file = fopen(filename, "r");
     if (*file == NULL) {
-        perror("Error");
+        perror("Archive opening error");
         return DOTLZB_FILE_ERROR;
     }
     char sigbuf[4];
@@ -40,7 +40,7 @@ uint8_t DOTLZB_write_dir_header(FILE * file, char * dir_name, uint16_t file_coun
     dir_header->file_compressed_size = 0;
     dir_header->file_name_size = strlen(dir_name) + 1;
     dir_header->file_original_size = 0;
-    if (fwrite(dir_header, sizeof(struct dotlzb_file_header), 1, file) != sizeof(struct dotlzb_file_header)) {
+    if (fwrite(dir_header, sizeof(struct dotlzb_file_header), 1, file) != 1) {
         free(dir_header);
         return DOTLZB_LESS_THAN_EXPECTED;
     }
@@ -48,6 +48,8 @@ uint8_t DOTLZB_write_dir_header(FILE * file, char * dir_name, uint16_t file_coun
     if (fwrite(dir_name, sizeof(char), strlen(dir_name) + 1, file) != strlen(dir_name) + 1) {
         return DOTLZB_LESS_THAN_EXPECTED;
     }
+    char * ns = "";
+    fwrite(ns, sizeof(uint8_t), 1, file);
     return DOTLZB_SUCCESS;
 }
 
@@ -66,6 +68,8 @@ uint8_t DOTLZB_write_file_header(FILE * file, char * file_name, uint32_t origina
     if (fwrite(file_name, sizeof(char), strlen(file_name) + 1, file) != strlen(file_name) + 1) {
         return DOTLZB_LESS_THAN_EXPECTED;
     }
+    //char * ns = "";
+    //fwrite(ns, sizeof(uint8_t), 1, file);
     return DOTLZB_SUCCESS;
 }
 
@@ -78,6 +82,7 @@ uint8_t DOTLZB_compress_files(FILE * file, char * dir_name, char ** file_list, u
         strcat(path, "/");
         if (0 != access(path, F_OK)) {
             if (ENOENT == errno) {
+                printf("File opening error: No such file or directory\n");
                 return DOTLZB_NOT_EXISTS;
             }
             if (ENOTDIR == errno) {
@@ -95,15 +100,18 @@ uint8_t DOTLZB_compress_files(FILE * file, char * dir_name, char ** file_list, u
                 return DOTLZB_NOT_EXISTS;
             }
             while ((entry = readdir(d)) != NULL) {
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                    continue;
                 if ((entry->d_type == DT_REG) || (entry->d_type == DT_DIR)) {
                     subdir_list = realloc(subdir_list, sizeof(char *) * ++subdir_list_size);
                     tmp = malloc(sizeof(char) * (strlen(entry->d_name) + 1));
+                    strcpy(tmp, entry->d_name);
                     subdir_list[subdir_list_size - 1] = tmp;
-                    free(entry);
                 }
             }
             closedir(d);
-            DOTLZB_write_dir_header(file, dir_name, subdir_list_size);
+            DOTLZB_write_dir_header(file, file_list[i], subdir_list_size);
+            printf("adding directory: %s\n", path);
             uint8_t retcode = DOTLZB_compress_files(file, path, subdir_list, subdir_list_size);
             if (retcode != DOTLZB_SUCCESS) {
                 return retcode;
@@ -119,9 +127,11 @@ uint8_t DOTLZB_compress_files(FILE * file, char * dir_name, char ** file_list, u
             fseek(inp_f, 0L, SEEK_END);
             uint32_t inp_sz = ftell(inp_f);
             fseek(inp_f, 0L, SEEK_SET);
+            printf("adding file: %s\n", path);
             lz77_compress(inp_f, file, inp_sz, file_list[i], *DOTLZB_write_file_header);
             fclose(inp_f);
         }
+        free(path);
     }
     return DOTLZB_SUCCESS;
 }
@@ -129,22 +139,31 @@ uint8_t DOTLZB_compress_files(FILE * file, char * dir_name, char ** file_list, u
 uint8_t DOTLZB_decompress_file(FILE * file, char * dirname, uint16_t file_count) {
     uint16_t file_processed;
     while ((file_count == 0 && !feof(file)) || (file_processed < file_count)) {
-        dotlzb_file_header file_header = malloc(sizeof(struct dotlzb_file_header));
+        dotlzb_file_header file_header = calloc(1, sizeof(struct dotlzb_file_header));
         DOTLZB_enum_file(file, file_header);
         char * fname = malloc(file_header->file_name_size + 1);
         fread(fname, sizeof(char), file_header->file_name_size + 1, file);
         char * path = malloc(strlen(dirname) + strlen(fname) + 2);
         strcpy(path, dirname);
         strcat(path, fname);
+        if (file_header->file_name_size == 0 || strcmp(fname, "") == 0) { //to avoid empty files
+            break;
+        }
         if (file_header->file_count > 0) {
-            //its a directory
+            //its a directory header
             mkdir(path, 0777);
             strcat(path, "/");
+            printf("extracting directory: %s\n", path);
             DOTLZB_decompress_file(file, path, file_header->file_count);
         } else {
             FILE * out_f = fopen(path, "w");
-            lz77_decompress(file, out_f, file_header->file_compressed_size);
-            fclose(out_f);
+            printf("extracting file: %s\n", path);
+            if (out_f != NULL) {
+                lz77_decompress(file, out_f, file_header->file_compressed_size);
+                fclose(out_f);
+            } else {
+                perror("Error");
+            }
         }
         file_processed++;
     }
